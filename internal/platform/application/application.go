@@ -37,7 +37,7 @@ type App struct {
 	}
 }
 
-func NewApplication(config *configs.Config) (*App, error) {
+func NewApplication(ctx context.Context, config *configs.Config) (*App, error) {
 	app := &App{
 		config: config,
 	}
@@ -65,6 +65,8 @@ func NewApplication(config *configs.Config) (*App, error) {
 	if err := app.registerWebSocketManager(); err != nil {
 		return nil, err
 	}
+
+	go app.monitorServices(ctx)
 
 	return app, nil
 }
@@ -167,6 +169,29 @@ func (a *App) registerWebSocketManager() error {
 
 	log.Info("WebSocket Manager service registered")
 	return nil
+}
+
+func (a *App) monitorServices(ctx context.Context) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info("Stopping service health monitoring...")
+			return
+		case <-ticker.C:
+			if err := a.Database.Mongo.Ping(ctx, nil); err != nil {
+				log.WithError(err).Warn("MongoDB is not reachable; attempting reconnection...")
+				_ = a.registerDatabase()
+			}
+
+			if !a.Client.WebSocketManager.IsConnected() {
+				log.Warn("WebSocket disconnected; attempting reconnection...")
+				_ = a.registerWebSocketManager()
+			}
+		}
+	}
 }
 
 func (a *App) Run(ctx context.Context) error {
