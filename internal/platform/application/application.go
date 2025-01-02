@@ -9,9 +9,11 @@ import (
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/transactionMonitor"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/transactionMonitorCoordinator"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/transport/webSocket"
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/utils"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"time"
 )
 
 type App struct {
@@ -68,12 +70,32 @@ func NewApplication(config *configs.Config) (*App, error) {
 }
 
 func (a *App) registerDatabase() error {
-	db, err := mongo.Connect(context.Background(), options.Client().ApplyURI(a.config.MongoURI))
+	err := utils.Retry(context.Background(), func() error {
+		db, err := mongo.Connect(context.Background(), options.Client().ApplyURI(a.config.MongoURI))
+		if err != nil {
+			return err
+		}
+		// Ping the database to ensure connectivity
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := db.Ping(ctx, nil); err != nil {
+			return err
+		}
+		a.Database.Mongo = db
+		return nil
+	},
+		utils.WithMaxAttempts(3),
+		utils.WithDelay(2*time.Second),
+		utils.WithBackoff(func(attempt int) time.Duration {
+			return time.Duration(attempt) * 2 * time.Second // Exponential backoff
+		}),
+	)
+
 	if err != nil {
-		log.WithError(err).Error("Failed to connect to MongoDB")
+		log.WithError(err).Error("Failed to connect to MongoDB after retries")
 		return err
 	}
-	a.Database.Mongo = db
+
 	log.Info("Connected to MongoDB")
 	return nil
 }
@@ -116,12 +138,26 @@ func (a *App) registerTransactionMonitorCoordinator() error {
 }
 
 func (a *App) registerWebSocketManager() error {
-	manager, err := webSocket.New(a.config.WebSocketScheme, a.config.WebSocketHost, a.config.WebSocketPath)
+	err := utils.Retry(context.Background(), func() error {
+		manager, err := webSocket.New(a.config.WebSocketScheme, a.config.WebSocketHost, a.config.WebSocketPath)
+		if err != nil {
+			return err
+		}
+		a.Client.WebSocketManager = manager
+		return nil
+	},
+		utils.WithMaxAttempts(5),
+		utils.WithDelay(1*time.Second),
+		utils.WithBackoff(func(attempt int) time.Duration {
+			return time.Duration(attempt) * 500 * time.Millisecond // Linear backoff
+		}),
+	)
+
 	if err != nil {
-		log.WithError(err).Error("Failed to initialize WebSocket manager")
+		log.WithError(err).Error("Failed to initialize WebSocket manager after retries")
 		return err
 	}
-	a.Client.WebSocketManager = manager
+
 	log.Info("WebSocket Manager service registered")
 	return nil
 }
