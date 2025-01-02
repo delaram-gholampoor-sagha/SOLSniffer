@@ -1,0 +1,11 @@
+mongo_uri: "mongodb://localhost:27017"
+solana_rpc: "https://api.mainnet-beta.solana.com"
+websocket_scheme: "wss"
+websocket_host: "api.mainnet-beta.solana.com"
+websocket_path: "/"
+monitored_wallets:
+  - "WalletAddress1"
+  - "WalletAddress2"
+monitored_tokens:
+  - "TokenMintAddress1"
+  - "TokenMintAddress2"
