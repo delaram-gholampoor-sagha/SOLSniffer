@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 	"net/url"
+	"time"
 )
 
 type Manager struct {
@@ -96,6 +97,18 @@ func (w *Manager) readJSONWithContext(ctx context.Context, v interface{}) error 
 	case err := <-done:
 		return err
 	}
+}
+
+func (w *Manager) IsConnected() bool {
+	return w.conn != nil && w.pingConnection()
+}
+
+func (w *Manager) pingConnection() bool {
+	if err := w.conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(1*time.Second)); err != nil {
+		log.WithError(err).Debug("WebSocket connection ping failed")
+		return false
+	}
+	return true
 }
 
 func (w *Manager) ReadMessage() ([]byte, error) {

@@ -21,14 +21,12 @@ func init() {
 }
 
 func main() {
-	app, err := application.NewApplication(config)
+	ctx, cancel := context.WithCancel(context.Background())
+	app, err := application.NewApplication(ctx, config)
 	if err != nil {
 		log.WithError(err).Fatal("Application setup failed")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Capture shutdown signals
 	shutdownSignal := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignal, syscall.SIGINT, syscall.SIGTERM)
 
