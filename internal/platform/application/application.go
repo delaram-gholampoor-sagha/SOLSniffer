@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"github.com/avast/retry-go"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/configs"
 	repositoriescontracts "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/contracts/repositories"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/repositories/transaction"
@@ -12,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"time"
 )
 
 type App struct {
@@ -68,12 +70,35 @@ func NewApplication(config *configs.Config) (*App, error) {
 }
 
 func (a *App) registerDatabase() error {
-	db, err := mongo.Connect(context.Background(), options.Client().ApplyURI(a.config.MongoURI))
+	err := retry.Do(
+		func() error {
+			db, err := mongo.Connect(context.Background(), options.Client().ApplyURI(a.config.MongoURI))
+			if err != nil {
+				return err
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := db.Ping(ctx, nil); err != nil {
+				return err
+			}
+
+			a.Database.Mongo = db
+			return nil
+		},
+		retry.Attempts(3),                   // Retry up to 3 times
+		retry.Delay(2*time.Second),          // Fixed delay between attempts
+		retry.DelayType(retry.BackOffDelay), // Exponential backoff
+		retry.OnRetry(func(n uint, err error) {
+			log.WithError(err).Warnf("Retrying database connection (attempt %d)", n+1)
+		}),
+	)
+
 	if err != nil {
-		log.WithError(err).Error("Failed to connect to MongoDB")
+		log.WithError(err).Error("Failed to connect to MongoDB after retries")
 		return err
 	}
-	a.Database.Mongo = db
+
 	log.Info("Connected to MongoDB")
 	return nil
 }
@@ -116,12 +141,30 @@ func (a *App) registerTransactionMonitorCoordinator() error {
 }
 
 func (a *App) registerWebSocketManager() error {
-	manager, err := webSocket.New(a.config.WebSocketScheme, a.config.WebSocketHost, a.config.WebSocketPath)
+
+	err := retry.Do(
+		func() error {
+			manager, err := webSocket.New(a.config.WebSocketScheme, a.config.WebSocketHost, a.config.WebSocketPath)
+			if err != nil {
+				return err
+			}
+
+			a.Client.WebSocketManager = manager
+			return nil
+		},
+		retry.Attempts(5),                 // Retry up to 5 times
+		retry.Delay(1*time.Second),        // Fixed delay of 1 second
+		retry.DelayType(retry.FixedDelay), // Use a fixed delay between attempts
+		retry.OnRetry(func(n uint, err error) {
+			log.WithError(err).Warnf("Retrying WebSocket manager initialization (attempt %d)", n+1)
+		}),
+	)
+
 	if err != nil {
-		log.WithError(err).Error("Failed to initialize WebSocket manager")
+		log.WithError(err).Error("Failed to initialize WebSocket manager after retries")
 		return err
 	}
-	a.Client.WebSocketManager = manager
+
 	log.Info("WebSocket Manager service registered")
 	return nil
 }
@@ -129,9 +172,23 @@ func (a *App) registerWebSocketManager() error {
 func (a *App) Run(ctx context.Context) error {
 	log.Info("Starting application...")
 
-	// Start TransactionMonitorCoordinator
-	if err := a.Services.TransactionMonitorCoordinator.Start(ctx); err != nil {
-		log.WithError(err).Error("Error while starting transaction monitor coordinator")
+	err := retry.Do(
+		func() error {
+			if err := a.Services.TransactionMonitorCoordinator.Start(ctx); err != nil {
+				return err
+			}
+			return nil
+		},
+		retry.Attempts(3),                   // Retry up to 3 times
+		retry.Delay(2*time.Second),          // Delay between retries
+		retry.DelayType(retry.BackOffDelay), // Exponential backoff
+		retry.OnRetry(func(n uint, err error) {
+			log.WithError(err).Warnf("Retrying TransactionMonitorCoordinator start (attempt %d)", n+1)
+		}),
+	)
+
+	if err != nil {
+		log.WithError(err).Error("Failed to start TransactionMonitorCoordinator after retries")
 		return err
 	}
 
@@ -142,13 +199,11 @@ func (a *App) Run(ctx context.Context) error {
 func (a *App) Shutdown(ctx context.Context) error {
 	log.Info("Shutting down application...")
 
-	// Stop TransactionMonitorCoordinator
 	if err := a.Services.TransactionMonitorCoordinator.Stop(ctx); err != nil {
 		log.WithError(err).Error("Failed to stop transaction monitor coordinator")
 		return err
 	}
 
-	// Disconnect Database
 	if err := a.Database.Mongo.Disconnect(ctx); err != nil {
 		log.WithError(err).Error("Failed to disconnect from MongoDB")
 		return err
