@@ -36,7 +36,7 @@ jobs:
       - name: Run Golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: latest
+          version: 'v1.48.0'
           args: run ./... --out-format=colored-line-number
 
       - name: Run gosec
