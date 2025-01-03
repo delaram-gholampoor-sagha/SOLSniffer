@@ -5,11 +5,14 @@ import (
 	"github.com/avast/retry-go"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/configs"
 	repositoriescontracts "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/contracts/repositories"
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/contracts/services"
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/platform/monitoring"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/repositories/transaction"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/tokenTransactionProcessor"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/transactionMonitor"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/transactionMonitorCoordinator"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/transport/webSocket"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -18,6 +21,10 @@ import (
 
 type App struct {
 	config *configs.Config
+
+	Monitoring         map[string]services.Monitoring
+	MonitoringRegistry *prometheus.Registry
+
 	Client struct {
 		WebSocketManager *webSocket.Manager
 	}
@@ -49,6 +56,8 @@ func NewApplication(ctx context.Context, config *configs.Config) (*App, error) {
 
 	// Register Repositories
 	app.registerRepositories()
+
+	app.registerMonitoring()
 
 	// Register TokenTransactionProcessor Service
 	app.registerTokenTransactionProcessor()
@@ -192,6 +201,21 @@ func (a *App) monitorServices(ctx context.Context) {
 			}
 		}
 	}
+}
+
+const (
+	AppMonitoring = "app_monitoring"
+)
+
+func (a *App) registerMonitoring() {
+	a.Monitoring[AppMonitoring] = monitoring.NewPrometheusAppMonitor()
+
+	registry := prometheus.NewRegistry()
+	for _, m := range a.Monitoring {
+		registry.MustRegister(m.GetRegistry())
+	}
+
+	a.MonitoringRegistry = registry
 }
 
 func (a *App) Run(ctx context.Context) error {
