@@ -40,4 +40,6 @@ jobs:
 #          args: run ./... --out-format=colored-line-number
 
       - name: Run gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.16.0 && gosec ./...
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.16.0
+          gosec ./... -fmt=json -verbose
