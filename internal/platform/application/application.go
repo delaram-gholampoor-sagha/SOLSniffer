@@ -5,10 +5,10 @@ import (
 	"github.com/avast/retry-go"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/configs"
 	repositoriescontracts "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/contracts/repositories"
-	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/backfillTransaction"
-
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/contracts/services"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/platform/monitoring"
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/backfillTransaction"
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/transport/solanaClient"
 
 	log "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/logger"
 
@@ -32,6 +32,7 @@ type App struct {
 	MonitoringRegistry *prometheus.Registry
 
 	Client struct {
+		SolanaClient     *solanaClient.SolanaClient
 		WebSocketManager *webSocket.Manager
 	}
 
@@ -135,6 +136,13 @@ func (a *App) registerRepositories() {
 	log.Infof("Repositories registered")
 }
 
+func (a *App) registerSolanaClient() {
+	solanaClient := solanaClient.New()
+	a.Client.SolanaClient = solanaClient
+
+	log.Infof("Solana Client registered successfully")
+}
+
 func (a *App) registerTokenTransactionProcessor() {
 	a.Services.TokenProcessor = tokenTransactionProcessor.New(
 		a.Repositories.Transaction,
@@ -145,7 +153,9 @@ func (a *App) registerTokenTransactionProcessor() {
 }
 
 func (a *App) registerTransactionMonitor() {
-	transactionMonitor := transactionMonitor.New(a.Services.TokenProcessor)
+	transactionMonitor := transactionMonitor.New(
+		a.Client.SolanaClient,
+		a.Services.TokenProcessor)
 
 	a.Services.TransactionMonitor = transactionMonitor
 	log.Infof("Transaction Monitor service registered")
@@ -154,6 +164,7 @@ func (a *App) registerTransactionMonitor() {
 
 func (a *App) registerBackfillTransaction() {
 	backFillTrnasaction := backfillTransaction.New(
+		a.Client.SolanaClient,
 		&a.config.Backfill,
 		a.Repositories.BackfillTransaction,
 		a.Services.TokenProcessor)
@@ -164,14 +175,10 @@ func (a *App) registerBackfillTransaction() {
 }
 
 func (a *App) registerTransactionMonitorCoordinator() error {
-	coordinator, err := transactionMonitorCoordinator.New(
+	coordinator := transactionMonitorCoordinator.New(
 		a.Services.TransactionMonitor,
 		a.Client.WebSocketManager,
 	)
-	if err != nil {
-		log.Errorf("Failed to initialize transaction monitor coordinator")
-		return err
-	}
 
 	a.Services.TransactionMonitorCoordinator = coordinator
 	log.Infof("Transaction Monitor Coordinator service registered")
