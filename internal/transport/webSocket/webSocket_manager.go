@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/enums"
+	log "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/logger"
 	"github.com/gorilla/websocket"
-	log "github.com/sirupsen/logrus"
 	"net/url"
 	"time"
 )
@@ -105,7 +105,7 @@ func (w *Manager) IsConnected() bool {
 
 func (w *Manager) pingConnection() bool {
 	if err := w.conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(1*time.Second)); err != nil {
-		log.WithError(err).Debug("WebSocket connection ping failed")
+		log.Debugf("WebSocket connection ping failed")
 		return false
 	}
 	return true
@@ -124,7 +124,7 @@ func (w *Manager) Close() error {
 		if err := w.conn.Close(); err != nil {
 			return fmt.Errorf("failed to close WebSocket connection: %w", err)
 		}
-		log.Info("WebSocket connection closed")
+		log.Infof("WebSocket connection closed")
 	}
 	return nil
 }

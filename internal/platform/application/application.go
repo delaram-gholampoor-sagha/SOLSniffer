@@ -5,12 +5,13 @@ import (
 	"github.com/avast/retry-go"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/configs"
 	repositoriescontracts "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/contracts/repositories"
+	log "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/logger"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/repositories/transaction"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/tokenTransactionProcessor"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/transactionMonitor"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/transactionMonitorCoordinator"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/transport/webSocket"
-	log "github.com/sirupsen/logrus"
+
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"time"
@@ -40,6 +41,11 @@ type App struct {
 func NewApplication(ctx context.Context, config *configs.Config) (*App, error) {
 	app := &App{
 		config: config,
+	}
+
+	err := app.setupLogger()
+	if err != nil {
+		return nil, err
 	}
 
 	// Register Database
@@ -92,22 +98,22 @@ func (a *App) registerDatabase() error {
 		retry.Delay(2*time.Second),          // Fixed delay between attempts
 		retry.DelayType(retry.BackOffDelay), // Exponential backoff
 		retry.OnRetry(func(n uint, err error) {
-			log.WithError(err).Warnf("Retrying database connection (attempt %d)", n+1)
+			log.Warnf("Retrying database connection (attempt %d)", n+1)
 		}),
 	)
 
 	if err != nil {
-		log.WithError(err).Error("Failed to connect to MongoDB after retries")
+		log.Errorf("Failed to connect to MongoDB after retries")
 		return err
 	}
 
-	log.Info("Connected to MongoDB")
+	log.Infof("Connected to MongoDB")
 	return nil
 }
 
 func (a *App) registerRepositories() {
 	a.Repositories.Transaction = transaction.NewTransactionRepository(a.Database.Mongo)
-	log.Info("Repositories registered")
+	log.Infof("Repositories registered")
 }
 
 func (a *App) registerTokenTransactionProcessor() {
@@ -116,14 +122,14 @@ func (a *App) registerTokenTransactionProcessor() {
 		a.config.Services.Tokens,
 		a.config.Services.Wallets,
 	)
-	log.Info("Token Transaction Processor service registered")
+	log.Infof("Token Transaction Processor service registered")
 }
 
 func (a *App) registerTransactionMonitor() {
 	transactionMonitor := transactionMonitor.New(a.Services.TokenProcessor)
 
 	a.Services.TransactionMonitor = transactionMonitor
-	log.Info("Transaction Monitor service registered")
+	log.Infof("Transaction Monitor service registered")
 
 }
 
@@ -133,12 +139,12 @@ func (a *App) registerTransactionMonitorCoordinator() error {
 		a.Client.WebSocketManager,
 	)
 	if err != nil {
-		log.WithError(err).Error("Failed to initialize transaction monitor coordinator")
+		log.Errorf("Failed to initialize transaction monitor coordinator")
 		return err
 	}
 
 	a.Services.TransactionMonitorCoordinator = coordinator
-	log.Info("Transaction Monitor Coordinator service registered")
+	log.Infof("Transaction Monitor Coordinator service registered")
 	return nil
 }
 
@@ -158,16 +164,16 @@ func (a *App) registerWebSocketManager() error {
 		retry.Delay(1*time.Second),        // Fixed delay of 1 second
 		retry.DelayType(retry.FixedDelay), // Use a fixed delay between attempts
 		retry.OnRetry(func(n uint, err error) {
-			log.WithError(err).Warnf("Retrying WebSocket manager initialization (attempt %d)", n+1)
+			log.Warnf("Retrying WebSocket manager initialization (attempt %d)", n+1)
 		}),
 	)
 
 	if err != nil {
-		log.WithError(err).Error("Failed to initialize WebSocket manager after retries")
+		log.Errorf("Failed to initialize WebSocket manager after retries")
 		return err
 	}
 
-	log.Info("WebSocket Manager service registered")
+	log.Infof("WebSocket Manager service registered")
 	return nil
 }
 
@@ -178,24 +184,34 @@ func (a *App) monitorServices(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info("Stopping service health monitoring...")
+			log.Infof("Stopping service health monitoring...")
 			return
 		case <-ticker.C:
 			if err := a.Database.Mongo.Ping(ctx, nil); err != nil {
-				log.WithError(err).Warn("MongoDB is not reachable; attempting reconnection...")
+				log.Warnf("MongoDB is not reachable; attempting reconnection...")
 				_ = a.registerDatabase()
 			}
 
 			if !a.Client.WebSocketManager.IsConnected() {
-				log.Warn("WebSocket disconnected; attempting reconnection...")
+				log.Warnf("WebSocket disconnected; attempting reconnection...")
 				_ = a.registerWebSocketManager()
 			}
 		}
 	}
 }
 
+func (a *App) setupLogger() error {
+	err := log.Register(a.config.App)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("Logger registered successfully")
+	return nil
+}
+
 func (a *App) Run(ctx context.Context) error {
-	log.Info("Starting application...")
+	log.Infof("Starting application...")
 
 	err := retry.Do(
 		func() error {
@@ -208,32 +224,32 @@ func (a *App) Run(ctx context.Context) error {
 		retry.Delay(2*time.Second),          // Delay between retries
 		retry.DelayType(retry.BackOffDelay), // Exponential backoff
 		retry.OnRetry(func(n uint, err error) {
-			log.WithError(err).Warnf("Retrying TransactionMonitorCoordinator start (attempt %d)", n+1)
+			log.Warnf("Retrying TransactionMonitorCoordinator start (attempt %d)", n+1)
 		}),
 	)
 
 	if err != nil {
-		log.WithError(err).Error("Failed to start TransactionMonitorCoordinator after retries")
+		log.Errorf("Failed to start TransactionMonitorCoordinator after retries")
 		return err
 	}
 
-	log.Info("Transaction monitor coordinator started")
+	log.Infof("Transaction monitor coordinator started")
 	return nil
 }
 
 func (a *App) Shutdown(ctx context.Context) error {
-	log.Info("Shutting down application...")
+	log.Infof("Shutting down application...")
 
 	if err := a.Services.TransactionMonitorCoordinator.Stop(ctx); err != nil {
-		log.WithError(err).Error("Failed to stop transaction monitor coordinator")
+		log.Errorf("Failed to stop transaction monitor coordinator")
 		return err
 	}
 
 	if err := a.Database.Mongo.Disconnect(ctx); err != nil {
-		log.WithError(err).Error("Failed to disconnect from MongoDB")
+		log.Errorf("Failed to disconnect from MongoDB")
 		return err
 	}
 
-	log.Info("Application shutdown completed successfully")
+	log.Infof("Application shutdown completed successfully")
 	return nil
 }

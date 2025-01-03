@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"github.com/blocto/solana-go-sdk/client"
 	"github.com/blocto/solana-go-sdk/rpc"
+	log "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/logger"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/tokenTransactionProcessor"
-	log "github.com/sirupsen/logrus"
 )
 
 type Service struct {

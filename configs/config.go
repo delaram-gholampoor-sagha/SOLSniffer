@@ -2,6 +2,7 @@ package configs
 
 import (
 	"fmt"
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/utils"
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
@@ -35,7 +36,20 @@ type CoordinatorConfig struct {
 	Retry RetryConfig `yaml:"retry"`
 }
 
+type AppConfig struct {
+	Env             utils.Environment `yaml:"env"`
+	Addr            string            `yaml:"addr"`
+	ApplicationName string            `yaml:"application_name"`
+	Log             LogConfig         `yaml:"log"`
+}
+
+type LogConfig struct {
+	LogLevel    string `yaml:"log_level"`
+	PrettyPrint bool   `yaml:"pretty_print"`
+}
+
 type Config struct {
+	App         AppConfig         `yaml:"app"`
 	Database    DatabaseConfig    `yaml:"database"`
 	WebSocket   WebSocketConfig   `yaml:"websocket"`
 	Services    ServicesConfig    `yaml:"services"`

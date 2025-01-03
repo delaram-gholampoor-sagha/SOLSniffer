@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/blocto/solana-go-sdk/client"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/contracts/repositories"
-	log "github.com/sirupsen/logrus"
+	log "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/logger"
 	"math"
 	"strconv"
 	"time"
@@ -43,15 +43,12 @@ func New(repo repositories.Transaction, tokens, wallets []string) *Service {
 }
 
 func (s *Service) ProcessTransaction(ctx context.Context, txDetails *client.Transaction) error {
-	// Check for signatures
 	if len(txDetails.Transaction.Signatures) == 0 {
 		return fmt.Errorf("no signatures found in transaction")
 	}
 
-	// Convert signature to string
 	hash := hex.EncodeToString(txDetails.Transaction.Signatures[0])
 
-	// Ensure there are enough account keys
 	if len(txDetails.Transaction.Message.Accounts) < 2 {
 		return fmt.Errorf("not enough accounts in transaction message")
 	}
@@ -59,7 +56,6 @@ func (s *Service) ProcessTransaction(ctx context.Context, txDetails *client.Tran
 	source := txDetails.Transaction.Message.Accounts[0].ToBase58()
 	destination := txDetails.Transaction.Message.Accounts[1].ToBase58()
 
-	// Handle token balances
 	if len(txDetails.Meta.PreTokenBalances) == 0 {
 		log.Warnf("Transaction %s has no token balances; skipping", hash)
 		return nil
@@ -69,32 +65,27 @@ func (s *Service) ProcessTransaction(ctx context.Context, txDetails *client.Tran
 		amountStr := balance.UITokenAmount.Amount
 		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
-			log.WithError(err).Errorf("Failed to parse amount: %s", amountStr)
+			log.Errorf("Failed to parse amount: %s", amountStr)
 			continue
 		}
 
-		// Normalize the token amount
 		amount /= math.Pow10(int(balance.UITokenAmount.Decimals))
 		token := balance.Mint
 
-		// Determine if the token is Native SOL or SPL Token
 		isNativeSOL := token == "NativeSOL"
 		if !isNativeSOL && !s.monitoredTokens[token] {
 			log.Infof("Transaction %s with token %s does not match token filters", hash, token)
 			continue
 		}
 
-		// Filter by destination wallet
 		if !s.monitoredWallets[destination] {
 			log.Infof("Transaction %s with destination %s does not match wallet filters", hash, destination)
 			continue
 		}
 
-		// Save to the database
-
 		err = s.repo.Save(ctx, hash, source, destination, amount, token, time.Now())
 		if err != nil {
-			log.WithError(err).Errorf("Failed to save transaction %s", hash)
+			log.Errorf("Failed to save transaction %s", hash)
 			continue
 		}
 
