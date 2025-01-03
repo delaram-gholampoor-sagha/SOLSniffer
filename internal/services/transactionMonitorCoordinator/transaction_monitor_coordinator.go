@@ -23,7 +23,6 @@ func New(service *transactionMonitor.Service, webSocketManager *webSocket.Manage
 func (c *Service) Start(ctx context.Context) error {
 	log.Infof("Starting transaction monitor coordinator...")
 
-	// Subscribe to logs
 	subscriptionID, err := c.webSocketManager.Subscribe(ctx, enums.LogsSubscribe)
 	if err != nil {
 		return err
