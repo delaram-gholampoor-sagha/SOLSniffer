@@ -74,7 +74,7 @@ func NewApplication(ctx context.Context, config *configs.Config) (*App, error) {
 func (a *App) registerDatabase() error {
 	err := retry.Do(
 		func() error {
-			db, err := mongo.Connect(context.Background(), options.Client().ApplyURI(a.config.MongoURI))
+			db, err := mongo.Connect(context.Background(), options.Client().ApplyURI(a.config.Database.URI))
 			if err != nil {
 				return err
 			}
@@ -113,8 +113,8 @@ func (a *App) registerRepositories() {
 func (a *App) registerTokenTransactionProcessor() {
 	a.Services.TokenProcessor = tokenTransactionProcessor.New(
 		a.Repositories.Transaction,
-		a.config.Tokens,
-		a.config.Wallets,
+		a.config.Services.Tokens,
+		a.config.Services.Wallets,
 	)
 	log.Info("Token Transaction Processor service registered")
 }
@@ -146,7 +146,7 @@ func (a *App) registerWebSocketManager() error {
 
 	err := retry.Do(
 		func() error {
-			manager, err := webSocket.New(a.config.WebSocketScheme, a.config.WebSocketHost, a.config.WebSocketPath)
+			manager, err := webSocket.New(a.config.WebSocket.Scheme, a.config.WebSocket.Host, a.config.WebSocket.Path)
 			if err != nil {
 				return err
 			}
