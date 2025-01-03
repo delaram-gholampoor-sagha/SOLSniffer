@@ -78,6 +78,8 @@ func NewApplication(ctx context.Context, config *configs.Config) (*App, error) {
 	// Register TransactionMonitor Service
 	app.registerTransactionMonitor()
 
+	app.registerBackfillTransaction()
+
 	// Register TransactionMonitorCoordinator Service
 	if err := app.registerTransactionMonitorCoordinator(); err != nil {
 		return nil, err
