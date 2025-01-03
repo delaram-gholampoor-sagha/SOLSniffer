@@ -5,16 +5,41 @@ import (
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
+	"time"
 )
 
+type RetryConfig struct {
+	Attempts  uint          `yaml:"attempts"`
+	Delay     time.Duration `yaml:"delay"`
+	DelayType string        `yaml:"delay_type"`
+}
+
+type DatabaseConfig struct {
+	URI   string      `yaml:"uri"`
+	Retry RetryConfig `yaml:"retry"`
+}
+
+type WebSocketConfig struct {
+	Scheme string      `yaml:"scheme"`
+	Host   string      `yaml:"host"`
+	Path   string      `yaml:"path"`
+	Retry  RetryConfig `yaml:"retry"`
+}
+
+type ServicesConfig struct {
+	Wallets []string `yaml:"wallets"`
+	Tokens  []string `yaml:"tokens"`
+}
+
+type CoordinatorConfig struct {
+	Retry RetryConfig `yaml:"retry"`
+}
+
 type Config struct {
-	MongoURI        string   `yaml:"mongo_uri"`
-	SolanaRPC       string   `yaml:"solana_rpc"`
-	WebSocketScheme string   `yaml:"websocket_scheme"`
-	WebSocketHost   string   `yaml:"websocket_host"`
-	WebSocketPath   string   `yaml:"websocket_path"`
-	Wallets         []string `yaml:"monitored_wallets"`
-	Tokens          []string `yaml:"monitored_tokens"`
+	Database    DatabaseConfig    `yaml:"database"`
+	WebSocket   WebSocketConfig   `yaml:"websocket"`
+	Services    ServicesConfig    `yaml:"services"`
+	Coordinator CoordinatorConfig `yaml:"coordinator"`
 }
 
 // Load reads and parses the YAML configuration file.
@@ -49,26 +74,23 @@ func Load(configPath string) (*Config, error) {
 }
 
 func validateConfig(cfg *Config) error {
-	if cfg.MongoURI == "" {
-		return fmt.Errorf("mongo_uri is required")
+	if cfg.Database.URI == "" {
+		return fmt.Errorf("database.uri is required")
 	}
-	if cfg.SolanaRPC == "" {
-		return fmt.Errorf("solana_rpc is required")
+	if cfg.WebSocket.Scheme == "" {
+		return fmt.Errorf("websocket.scheme is required")
 	}
-	if cfg.WebSocketScheme == "" {
-		return fmt.Errorf("websocket_scheme is required")
+	if cfg.WebSocket.Host == "" {
+		return fmt.Errorf("websocket.host is required")
 	}
-	if cfg.WebSocketHost == "" {
-		return fmt.Errorf("websocket_host is required")
+	if cfg.WebSocket.Path == "" {
+		return fmt.Errorf("websocket.path is required")
 	}
-	if cfg.WebSocketPath == "" {
-		return fmt.Errorf("websocket_path is required")
+	if len(cfg.Services.Wallets) == 0 {
+		return fmt.Errorf("services.wallets must have at least one entry")
 	}
-	if len(cfg.Wallets) == 0 {
-		return fmt.Errorf("monitored_wallets must have at least one entry")
-	}
-	if len(cfg.Tokens) == 0 {
-		return fmt.Errorf("monitored_tokens must have at least one entry")
+	if len(cfg.Services.Tokens) == 0 {
+		return fmt.Errorf("services.tokens must have at least one entry")
 	}
 	return nil
 }
