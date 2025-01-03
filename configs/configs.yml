@@ -35,3 +35,7 @@ coordinator:
     attempts: 3
     delay: 2s
     delay_type: backoff
+
+backfill:
+  max_concurrency: 10
+  chunk_size: 100

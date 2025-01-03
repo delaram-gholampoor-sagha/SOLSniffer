@@ -5,6 +5,7 @@ import (
 	"github.com/avast/retry-go"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/configs"
 	repositoriescontracts "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/contracts/repositories"
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/backfillTransaction"
 
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/contracts/services"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/platform/monitoring"
@@ -38,10 +39,12 @@ type App struct {
 		TokenProcessor                *tokenTransactionProcessor.Service
 		TransactionMonitor            *transactionMonitor.Service
 		TransactionMonitorCoordinator *transactionMonitorCoordinator.Service
+		BackfillTransaction           *backfillTransaction.Service
 	}
 
 	Repositories struct {
-		Transaction repositoriescontracts.Transaction
+		Transaction         repositoriescontracts.Transaction
+		BackfillTransaction repositoriescontracts.BackfillTransactionRepository
 	}
 
 	Database struct {
@@ -126,6 +129,7 @@ func (a *App) registerDatabase() error {
 
 func (a *App) registerRepositories() {
 	a.Repositories.Transaction = transaction.NewTransactionRepository(a.Database.Mongo)
+	a.Repositories.BackfillTransaction = transaction.NewMetadataRepository(a.Database.Mongo)
 	log.Infof("Repositories registered")
 }
 
@@ -142,6 +146,17 @@ func (a *App) registerTransactionMonitor() {
 	transactionMonitor := transactionMonitor.New(a.Services.TokenProcessor)
 
 	a.Services.TransactionMonitor = transactionMonitor
+	log.Infof("Transaction Monitor service registered")
+
+}
+
+func (a *App) registerBackfillTransaction() {
+	backFillTrnasaction := backfillTransaction.New(
+		&a.config.Backfill,
+		a.Repositories.BackfillTransaction,
+		a.Services.TokenProcessor)
+
+	a.Services.BackfillTransaction = backFillTrnasaction
 	log.Infof("Transaction Monitor service registered")
 
 }
