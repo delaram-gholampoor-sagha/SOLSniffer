@@ -13,11 +13,11 @@ type Service struct {
 	service          *transactionMonitor.Service
 }
 
-func New(service *transactionMonitor.Service, webSocketManager *webSocket.Manager) (*Service, error) {
+func New(service *transactionMonitor.Service, webSocketManager *webSocket.Manager) *Service {
 	return &Service{
 		webSocketManager: webSocketManager,
 		service:          service,
-	}, nil
+	}
 }
 
 func (c *Service) Start(ctx context.Context) error {

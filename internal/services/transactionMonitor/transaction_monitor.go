@@ -4,20 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/blocto/solana-go-sdk/client"
-	"github.com/blocto/solana-go-sdk/rpc"
 	log "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/logger"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/tokenTransactionProcessor"
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/transport/solanaClient"
 )
 
 type Service struct {
-	client             *client.Client
+	solanaClient       *solanaClient.SolanaClient
 	transactionService *tokenTransactionProcessor.Service
 }
 
-func New(transactionService *tokenTransactionProcessor.Service) *Service {
+func New(solanaClient *solanaClient.SolanaClient, transactionService *tokenTransactionProcessor.Service) *Service {
 	return &Service{
-		client:             client.NewClient(rpc.MainnetRPCEndpoint),
+		solanaClient:       solanaClient,
 		transactionService: transactionService,
 	}
 }
@@ -40,7 +39,7 @@ func (t *Service) ProcessMessage(ctx context.Context, message []byte) error {
 }
 
 func (t *Service) processTransaction(ctx context.Context, signature string) error {
-	txDetails, err := t.client.GetTransaction(ctx, signature)
+	txDetails, err := t.solanaClient.GetTransaction(ctx, signature)
 	if err != nil {
 		return fmt.Errorf("failed to fetch transaction details for signature %s: %w", signature, err)
 	}

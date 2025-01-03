@@ -4,27 +4,26 @@ import (
 	"context"
 	"fmt"
 	"github.com/avast/retry-go"
-	"github.com/blocto/solana-go-sdk/client"
-	"github.com/blocto/solana-go-sdk/rpc"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/configs"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/contracts/repositories"
 	log "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/logger"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/tokenTransactionProcessor"
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/transport/solanaClient"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/utils"
 	"sync"
 	"time"
 )
 
 type Service struct {
-	client                  *client.Client
+	solanaClient            *solanaClient.SolanaClient
 	metadataRepo            repositories.BackfillTransactionRepository
 	tokenTransactionService *tokenTransactionProcessor.Service
 	backfillConfig          *configs.BackfillConfig
 }
 
-func New(config *configs.BackfillConfig, metadataRepo repositories.BackfillTransactionRepository, transactionService *tokenTransactionProcessor.Service) *Service {
+func New(solanaClient *solanaClient.SolanaClient, config *configs.BackfillConfig, metadataRepo repositories.BackfillTransactionRepository, transactionService *tokenTransactionProcessor.Service) *Service {
 	return &Service{
-		client:                  client.NewClient(rpc.MainnetRPCEndpoint),
+		solanaClient:            solanaClient,
 		metadataRepo:            metadataRepo,
 		tokenTransactionService: transactionService,
 		backfillConfig:          config,
@@ -33,7 +32,7 @@ func New(config *configs.BackfillConfig, metadataRepo repositories.BackfillTrans
 
 func (s *Service) BackfillMissedBlocks(ctx context.Context) error {
 	// Get the latest block height and the last processed block height
-	currentBlock, err := s.getCurrentBlockHeight(ctx)
+	currentBlock, err := s.solanaClient.GetBlockHeight(ctx)
 	if err != nil {
 		return err
 	}
@@ -61,15 +60,6 @@ func (s *Service) BackfillMissedBlocks(ctx context.Context) error {
 	// Wait for all goroutines to finish
 	wg.Wait()
 	return nil
-}
-
-// getCurrentBlockHeight fetches the latest block height
-func (s *Service) getCurrentBlockHeight(ctx context.Context) (int64, error) {
-	blockDetails, err := s.client.GetBlock(ctx, uint64(0)) // Use slot 0 to get the latest block
-	if err != nil {
-		return 0, fmt.Errorf("failed to fetch latest block details: %w", err)
-	}
-	return *blockDetails.BlockHeight, nil
 }
 
 // getLastProcessedBlock retrieves the last processed block from the metadata repository
@@ -122,7 +112,7 @@ func (s *Service) processBlock(ctx context.Context, block int64) error {
 	uint64Block := uint64(block)
 
 	// Fetch block details using the client
-	blockDetails, err := s.client.GetBlock(ctx, uint64Block)
+	blockDetails, err := s.solanaClient.GetBlock(ctx, uint64Block)
 	if err != nil {
 		return fmt.Errorf("failed to fetch block %d: %w", block, err)
 	}
