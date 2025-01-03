@@ -54,7 +54,7 @@ type Config struct {
 	WebSocket   WebSocketConfig   `yaml:"websocket"`
 	Services    ServicesConfig    `yaml:"services"`
 	Coordinator CoordinatorConfig `yaml:"coordinator"`
-	Backfill    BackfillConfig    `yaml:"backfill"` // Add this section for backfill-specific settings
+	Backfill    BackfillConfig    `yaml:"backfill"`
 }
 
 type BackfillConfig struct {
@@ -66,26 +66,22 @@ type BackfillConfig struct {
 func Load(configPath string) (*Config, error) {
 	var cfg Config
 
-	// Get the absolute path to the configuration file
 	absPath, err := filepath.Abs(configPath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Open the configuration file
 	f, err := os.Open(absPath)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	// Decode the YAML into the Config struct
 	decoder := yaml.NewDecoder(f)
 	if err := decoder.Decode(&cfg); err != nil {
 		return nil, err
 	}
 
-	// Validate required fields
 	if err := validateConfig(&cfg); err != nil {
 		return nil, err
 	}
