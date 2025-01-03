@@ -10,3 +10,14 @@ type Transaction struct {
 	TokenMint   string    `bson:"token_mint"`
 	Timestamp   time.Time `bson:"timestamp"`
 }
+
+type EventName uint
+
+type Event struct {
+	id     EventName
+	params []interface{}
+}
+
+func (e Event) GetID() EventName {
+	return e.id
+}

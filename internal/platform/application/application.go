@@ -81,6 +81,8 @@ func NewApplication(ctx context.Context, config *configs.Config) (*App, error) {
 
 	app.registerBackfillTransaction()
 
+	app.registerSolanaClient()
+
 	// Register TransactionMonitorCoordinator Service
 	if err := app.registerTransactionMonitorCoordinator(); err != nil {
 		return nil, err

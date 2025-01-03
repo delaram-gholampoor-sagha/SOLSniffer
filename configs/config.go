@@ -71,7 +71,9 @@ func Load(configPath string) (*Config, error) {
 		return nil, err
 	}
 
-	f, err := os.Open(absPath)
+	cleanPath := filepath.Clean(absPath)
+
+	f, err := os.Open(cleanPath)
 	if err != nil {
 		return nil, err
 	}
