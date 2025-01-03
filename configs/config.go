@@ -54,6 +54,12 @@ type Config struct {
 	WebSocket   WebSocketConfig   `yaml:"websocket"`
 	Services    ServicesConfig    `yaml:"services"`
 	Coordinator CoordinatorConfig `yaml:"coordinator"`
+	Backfill    BackfillConfig    `yaml:"backfill"` // Add this section for backfill-specific settings
+}
+
+type BackfillConfig struct {
+	MaxConcurrency int64 `yaml:"max_concurrency"`
+	ChunkSize      int64 `yaml:"chunk_size"`
 }
 
 // Load reads and parses the YAML configuration file.
