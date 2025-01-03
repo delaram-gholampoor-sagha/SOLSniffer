@@ -1,19 +1,11 @@
 package services
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/models/entity"
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 type Monitoring interface {
-	Record(event Event)
+	Record(event entity.Event)
 	GetRegistry() *prometheus.Registry
-}
-
-type EventName uint
-
-type Event struct {
-	id     EventName
-	params []interface{}
-}
-
-func (e Event) GetID() EventName {
-	return e.id
 }
