@@ -3,9 +3,9 @@ package transactionMonitorCoordinator
 import (
 	"context"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/enums"
+	log "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/logger"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/transactionMonitor"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/transport/webSocket"
-	log "github.com/sirupsen/logrus"
 )
 
 type Service struct {
@@ -21,7 +21,7 @@ func New(service *transactionMonitor.Service, webSocketManager *webSocket.Manage
 }
 
 func (c *Service) Start(ctx context.Context) error {
-	log.Info("Starting transaction monitor coordinator...")
+	log.Infof("Starting transaction monitor coordinator...")
 
 	// Subscribe to logs
 	subscriptionID, err := c.webSocketManager.Subscribe(ctx, enums.LogsSubscribe)
@@ -35,17 +35,17 @@ func (c *Service) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				log.Info("Transaction monitor coordinator stopped")
+				log.Infof("Transaction monitor coordinator stopped")
 				_ = c.webSocketManager.Unsubscribe(ctx, enums.LogsUnsubscribe)
 				return
 			default:
 				message, err := c.webSocketManager.ReadMessage()
 				if err != nil {
-					log.WithError(err).Error("Error reading WebSocket message")
+					log.Errorf("Error reading WebSocket message")
 					continue
 				}
 				if err := c.service.ProcessMessage(ctx, message); err != nil {
-					log.WithError(err).Error("Failed to process WebSocket message")
+					log.Errorf("Failed to process WebSocket message")
 				}
 			}
 		}
@@ -54,18 +54,18 @@ func (c *Service) Start(ctx context.Context) error {
 }
 
 func (c *Service) Stop(ctx context.Context) error {
-	log.Info("Stopping transaction monitor coordinator...")
+	log.Infof("Stopping transaction monitor coordinator...")
 
 	if err := c.webSocketManager.Unsubscribe(ctx, enums.LogsUnsubscribe); err != nil {
-		log.WithError(err).Error("Failed to unsubscribe from logs")
+		log.Errorf("Failed to unsubscribe from logs")
 		return err
 	}
 
 	if err := c.webSocketManager.Close(); err != nil {
-		log.WithError(err).Error("Failed to close WebSocket connection")
+		log.Errorf("Failed to close WebSocket connection")
 		return err
 	}
 
-	log.Info("Transaction monitor coordinator stopped successfully")
+	log.Infof("Transaction monitor coordinator stopped successfully")
 	return nil
 }
