@@ -2,9 +2,9 @@ package transactionMonitor
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	log "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/logger"
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/models/request"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/services/tokenTransactionProcessor"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/transport/solanaClient"
 )
@@ -22,20 +22,17 @@ func New(solanaClient *solanaClient.SolanaClient, transactionService *tokenTrans
 }
 
 func (t *Service) ProcessMessage(ctx context.Context, message []byte) error {
-	var logResult struct {
-		Params struct {
-			Result struct {
-				Signature string `json:"signature"`
-			} `json:"result"`
-		} `json:"params"`
-	}
-	if err := json.Unmarshal(message, &logResult); err != nil {
-		return fmt.Errorf("failed to parse WebSocket log message: %w", err)
+	txLog, err := request.ParseTransactionLog(message)
+	if err != nil {
+		return err
 	}
 
 	// Process the transaction signature
-	signature := logResult.Params.Result.Signature
-	return t.processTransaction(ctx, signature)
+	signature := txLog.Params.Result.Signature
+	if err := t.processTransaction(ctx, signature); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (t *Service) processTransaction(ctx context.Context, signature string) error {

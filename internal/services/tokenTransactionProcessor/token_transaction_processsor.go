@@ -7,6 +7,7 @@ import (
 	"github.com/blocto/solana-go-sdk/client"
 	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/contracts/repositories"
 	log "github.com/delaram-gholampoor-sagha/SOLSniffer/internal/logger"
+	"github.com/delaram-gholampoor-sagha/SOLSniffer/internal/models/entity"
 	"math"
 	"strconv"
 	"time"
@@ -83,7 +84,16 @@ func (s *Service) ProcessTransaction(ctx context.Context, txDetails *client.Tran
 			continue
 		}
 
-		err = s.repo.Save(ctx, hash, source, destination, amount, token, time.Now())
+		transaction := &entity.Transaction{
+			Hash:        hash,
+			Source:      source,
+			Destination: destination,
+			Amount:      amount,
+			TokenMint:   token,
+			Timestamp:   time.Now(),
+		}
+
+		err = s.repo.Save(ctx, transaction)
 		if err != nil {
 			log.Errorf("Failed to save transaction %s", hash)
 			continue
